@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" pnpm run migrate && pnpm run generate:importmap && next build",
+    "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" pnpm run migrate && pnpm run generate:importmap && next build --webpack",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
     "devsafe": "rm -rf .next && cross-env NODE_OPTIONS=--no-deprecation next dev",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation USE_S3_STORAGE=true tsx scripts/generateImportMap.ts",
@@ -21,7 +21,7 @@
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
     "typecheck": "tsc --noEmit",
     "check:ci": "biome check .",
-    "build:app": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build",
+    "build:app": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build --webpack",
     "verify": "pnpm run check:ci && pnpm run typecheck && pnpm run test:int",
     "verify:full": "pnpm run verify && pnpm run build:app && pnpm run test:e2e",
     "test": "pnpm run test:int && pnpm run test:e2e",

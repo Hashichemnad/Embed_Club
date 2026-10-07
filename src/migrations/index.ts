@@ -45,6 +45,7 @@ import * as migration_20260922_140000_add_build_targets from './20260922_140000_
 import * as migration_20260922_190000_reconcile_schema_drift from './20260922_190000_reconcile_schema_drift';
 import * as migration_20260924_120000_add_build_link_block from './20260924_120000_add_build_link_block';
 import * as migration_20260929_150324_allow_null_media_relations from './20260929_150324_allow_null_media_relations';
+import * as migration_20261007_163408_payload_3_90_upgrade from './20261007_163408_payload_3_90_upgrade';
 
 export const migrations = [
   {
@@ -280,6 +281,11 @@ export const migrations = [
   {
     up: migration_20260929_150324_allow_null_media_relations.up,
     down: migration_20260929_150324_allow_null_media_relations.down,
-    name: '20260929_150324_allow_null_media_relations'
+    name: '20260929_150324_allow_null_media_relations',
+  },
+  {
+    up: migration_20261007_163408_payload_3_90_upgrade.up,
+    down: migration_20261007_163408_payload_3_90_upgrade.down,
+    name: '20261007_163408_payload_3_90_upgrade'
   },
 ];

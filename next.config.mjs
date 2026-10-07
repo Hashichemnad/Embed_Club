@@ -80,6 +80,10 @@ const nextConfig = {
     '*.ts.net',
   ],
   experimental: {
+    // Build workers. Next defaults to one per CPU the machine reports, and a
+    // shared host reports far more CPUs than it lets one site use, so each
+    // extra worker (each loading Payload and a DB pool) only costs memory.
+    cpus: 2,
     optimizePackageImports: ['lucide-react', 'motion'],
   },
   serverExternalPackages: ['payload', 'shiki'],

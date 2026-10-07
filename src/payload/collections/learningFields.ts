@@ -1,0 +1,259 @@
+import { getServerSideURL } from '@/lib/getUrl'
+import type { CollectionConfig, Field, TextFieldValidation } from 'payload'
+
+import {
+  AccordionBlock,
+  BuildLinkBlock,
+  CodeBlock,
+  GraphBlock,
+  ImageBlock,
+  RowBlock,
+  SimulatorLinkBlock,
+  TableBlock,
+  TextBlock,
+  VideoBlock,
+} from './contentBlocks'
+
+/**
+ * Generate a URL-friendly slug from text
+ * Converts: "Raspberry Pi Setup Guide" -> "raspberry-pi-setup-guide"
+ */
+export function generateSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+}
+
+/** Card descriptions are clamped to two lines in the UI - stop copy that overflows. */
+export const CARD_DESCRIPTION_MAX_LENGTH = 200
+
+/**
+ * Resources and Tutorials are the same shape of document with different homes
+ * in the nav, so they share one field definition. They were a single collection
+ * split by a `type` select until 2026-07-28; separate collections keep the
+ * admin nav honest about what a member is actually creating.
+ */
+export function buildLearningFields({ noun }: { noun: string }): Field[] {
+  return [
+    {
+      type: 'tabs',
+      tabs: [
+        {
+          label: 'Basic Info',
+          fields: [
+            {
+              name: 'title',
+              label: `${noun} Title`,
+              type: 'text',
+              required: true,
+              admin: {
+                placeholder: 'e.g., Raspberry Pi Setup Guide',
+              },
+            },
+            {
+              name: 'slug',
+              type: 'text',
+              required: true,
+              unique: true,
+              admin: {
+                description:
+                  'Auto-generates from the title. Enter your own if it clashes with another page.',
+                placeholder: 'Will auto-generate when you type the title',
+              },
+            },
+            {
+              name: 'description',
+              label: 'Short Description',
+              type: 'textarea',
+              required: true,
+              maxLength: CARD_DESCRIPTION_MAX_LENGTH,
+              admin: {
+                description: `One-line summary shown in cards and previews (max ${CARD_DESCRIPTION_MAX_LENGTH} characters)`,
+              },
+            },
+            {
+              name: 'thumbnail',
+              label: 'Thumbnail Image',
+              type: 'upload',
+              relationTo: 'media',
+              required: false,
+              admin: {
+                description: 'Image displayed in cards',
+              },
+            },
+            {
+              name: 'source',
+              label: 'Where does the content come from?',
+              type: 'radio',
+              required: true,
+              defaultValue: 'manual',
+              options: [
+                { label: 'Write it here', value: 'manual' },
+                { label: 'Link to a file or page', value: 'link' },
+              ],
+              admin: {
+                layout: 'horizontal',
+                description:
+                  'Write the page in the Content tab, or paste a link and the site embeds it - a YouTube video, a PDF, a Google Drive file or folder, or a website.',
+              },
+            },
+            {
+              name: 'externalUrl',
+              label: 'Link',
+              type: 'text',
+              admin: {
+                condition: (_data, siblingData) => siblingData?.source === 'link',
+                placeholder: 'https://drive.google.com/file/d/.../view',
+                description:
+                  'Paste the link exactly as your browser shows it. The preview below updates as you type.',
+              },
+              validate: ((value, { siblingData }) => {
+                const data = siblingData as { source?: string } | undefined
+                if (data?.source !== 'link') return true
+                if (!value) return 'A link is required when the content is linked.'
+                try {
+                  const url = new URL(value)
+                  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+                    return 'The link must start with http:// or https://'
+                  }
+                } catch {
+                  return 'That does not look like a valid link.'
+                }
+                return true
+              }) satisfies TextFieldValidation,
+            },
+            {
+              name: 'externalPreview',
+              type: 'ui',
+              admin: {
+                condition: (_data, siblingData) => siblingData?.source === 'link',
+                components: {
+                  Field: '@/components/admin/externalLinkPreview',
+                },
+              },
+            },
+          ],
+        },
+        {
+          label: 'Metadata',
+          fields: [
+            {
+              name: 'difficulty',
+              type: 'select',
+              required: true,
+              options: [
+                { label: 'Beginner', value: 'beginner' },
+                { label: 'Intermediate', value: 'intermediate' },
+                { label: 'Advanced', value: 'advanced' },
+              ],
+              defaultValue: 'beginner',
+              admin: {
+                description: `Difficulty level for this ${noun.toLowerCase()}`,
+              },
+            },
+            {
+              name: 'tags',
+              type: 'relationship',
+              relationTo: 'tags',
+              hasMany: true,
+              required: false,
+              admin: {
+                description: 'Categorize with tags (Python, React, Backend, etc.)',
+              },
+            },
+            {
+              name: 'estimatedReadTime',
+              label: 'Estimated Read Time (minutes)',
+              type: 'number',
+              required: false,
+              min: 1,
+              max: 999,
+              admin: {
+                description: `Approximate time to complete this ${noun.toLowerCase()}`,
+                placeholder: '30',
+              },
+            },
+            {
+              name: 'badge',
+              type: 'select',
+              required: false,
+              options: [
+                { label: 'Featured', value: 'featured' },
+                { label: 'Popular', value: 'popular' },
+                { label: 'Essential', value: 'essential' },
+                { label: 'Coming Soon', value: 'comingSoon' },
+              ],
+              admin: {
+                position: 'sidebar',
+                description: 'Optional badge on the card. "Coming Soon" also makes it unclickable.',
+              },
+            },
+          ],
+        },
+        {
+          label: 'Content',
+          // Linked resources embed the link instead - the tab would only invite
+          // writing a body that never renders.
+          admin: {
+            condition: (data) => data?.source !== 'link',
+          },
+          fields: [
+            {
+              name: 'content',
+              type: 'blocks',
+              required: false,
+              minRows: 0,
+              blocks: [
+                TextBlock,
+                CodeBlock,
+                TableBlock,
+                GraphBlock,
+                ImageBlock,
+                VideoBlock,
+                RowBlock,
+                AccordionBlock,
+                SimulatorLinkBlock,
+                BuildLinkBlock,
+              ],
+              admin: {
+                description: 'The page body. Add text, code, images, diagrams and more as blocks.',
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ]
+}
+
+/**
+ * "Preview" button in the admin, opening the real published page in a new tab.
+ *
+ * Deliberately points at the live route rather than a draft renderer: these
+ * collections have no drafts/versions, so the saved document *is* what visitors
+ * see. Editors save, then preview.
+ */
+export function buildLearningPreview(basePath: string): CollectionConfig['admin'] {
+  return {
+    preview: (doc) => {
+      const slug = typeof doc?.slug === 'string' ? doc.slug : null
+      return slug ? `${getServerSideURL()}/${basePath}/${slug}` : null
+    },
+  }
+}
+
+/** Auto-fill the slug from the title the first time a doc is saved. */
+export const learningHooks: CollectionConfig['hooks'] = {
+  beforeValidate: [
+    ({ data }) => {
+      if (data?.title && !data?.slug) {
+        data.slug = generateSlug(data.title)
+      }
+      return data
+    },
+  ],
+}

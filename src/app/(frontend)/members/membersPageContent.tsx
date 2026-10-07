@@ -1,0 +1,254 @@
+'use client'
+
+import ChromaScene from '@/components/common/chromaScene'
+import { EmptyState } from '@/components/common/emptyState'
+import { PageTitle } from '@/components/common/pageTitle'
+import { TextReveal } from '@/components/common/textReveal'
+import { MemberModal, type MemberModalData } from '@/components/features/members/memberModal'
+import type { Member as MemberDoc, MemberPhoto as MemberPhotoDoc } from '@/payload/payload-types'
+import React from 'react'
+
+// Local ChromaGrid component (client-side wrapper)
+import ChromaGridWrapper from '@/components/common/chromaGridWrapper'
+
+function getPrimaryRoleSortOrder(member: MemberDoc) {
+  // roles is configured as hasMany: false (single relationship)
+  const rolesValue = member.roles as unknown as Record<string, unknown>
+
+  if (rolesValue && typeof rolesValue === 'object' && !Array.isArray(rolesValue)) {
+    const sortOrder = (rolesValue as unknown as Record<string, unknown>).sortOrder
+    return typeof sortOrder === 'number' ? sortOrder : 999
+  }
+
+  // Fallback: if roles somehow comes as an array, pick the lowest sortOrder
+  if (Array.isArray(rolesValue)) {
+    const sortOrders = rolesValue
+      .map((r) =>
+        typeof r === 'object' && r
+          ? (r as unknown as Record<string, unknown>).sortOrder
+          : undefined,
+      )
+      .filter((v): v is number => typeof v === 'number')
+
+    if (sortOrders.length === 0) return 999
+    return Math.min(...sortOrders)
+  }
+
+  return 999
+}
+
+function groupByCategorySorted(members: MemberDoc[]) {
+  const map = new Map<string, { items: MemberDoc[]; sortOrder: number; batchOrder: string }>()
+  for (const m of members) {
+    const catObj =
+      typeof m.category === 'object' && m.category
+        ? (m.category as unknown as Record<string, unknown>)
+        : undefined
+    const catLabel = (catObj?.name as string) ?? (catObj?.slug as string) ?? 'Uncategorized'
+    const sortOrder = (catObj?.sortOrder as number) ?? 999 // Use 999 for uncategorized so they appear last
+    // Set per category in the admin. Uncategorized members have no category doc
+    // to read it from, so they keep the historical oldest-first order.
+    const batchOrder = (catObj?.batchOrder as string) ?? 'oldestFirst'
+
+    const entry = map.get(catLabel)
+    if (!entry) {
+      const newEntry = { items: [m], sortOrder, batchOrder }
+      map.set(catLabel, newEntry)
+    } else {
+      entry.items.push(m)
+    }
+  }
+
+  // Within a category, members are grouped into batches (startYear–endYear).
+  // Batch direction is the category's own setting; inside a batch, role
+  // sortOrder decides.
+  const sorted = Array.from(map.entries())
+    .map(([category, { items, sortOrder, batchOrder }]) => {
+      const batchMap = new Map<string, { startYear: number; items: MemberDoc[] }>()
+      for (const m of items) {
+        const start = m.startYear ?? 0
+        const label = m.startYear ? `${m.startYear} – ${m.endYear ?? 'Present'}` : 'Batch Unknown'
+        const entry = batchMap.get(label)
+        if (entry) entry.items.push(m)
+        else batchMap.set(label, { startYear: start, items: [m] })
+      }
+
+      const newestFirst = batchOrder === 'newestFirst'
+      const batches = Array.from(batchMap.entries())
+        .map(([label, { startYear, items: batchItems }]) => {
+          batchItems.sort((a, b) => getPrimaryRoleSortOrder(a) - getPrimaryRoleSortOrder(b))
+          return { label, startYear, items: batchItems }
+        })
+        .sort((a, b) => (newestFirst ? b.startYear - a.startYear : a.startYear - b.startYear))
+
+      return { category, batches, sortOrder }
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder) // Sort categories by their sortOrder
+
+  return sorted
+}
+
+function resolveImageSrc(photo: MemberPhotoDoc | null) {
+  if (!photo) return undefined
+  const sizes = photo.sizes as unknown as Record<string, { url?: string }> | undefined
+  // Relative (/api/media/…) and absolute (S3) URLs both resolve in the browser.
+  return sizes?.card?.url || sizes?.thumbnail?.url || photo.url || undefined
+}
+
+/** Two initials from a name, for the placeholder avatar. */
+type MemberWithGeneratedAvatar = MemberDoc & { generatedAvatar?: string }
+
+function fallbackAvatar(member: MemberWithGeneratedAvatar): string {
+  return member.generatedAvatar ?? ''
+}
+
+function toChromaItems(items: MemberWithGeneratedAvatar[]) {
+  return items.map((m) => {
+    const photo = (m.photo as unknown as MemberPhotoDoc | null) ?? null
+    const src = resolveImageSrc(photo) ?? fallbackAvatar(m)
+    let rolesLabel = ''
+    if (Array.isArray(m.roles)) {
+      rolesLabel = (m.roles as unknown as Array<Record<string, unknown>>)
+        .map((r) => r?.name ?? r?.slug ?? r?.id)
+        .filter(Boolean)
+        .join(', ')
+    } else if (m.roles && typeof m.roles === 'object') {
+      rolesLabel =
+        ((m.roles as unknown as Record<string, unknown>)?.name as string) ??
+        ((m.roles as unknown as Record<string, unknown>)?.slug as string) ??
+        ''
+    }
+    const yearsLabel = m.startYear ? `${m.startYear}${m.endYear ? `–${m.endYear}` : ''}` : ''
+    const subtitle = rolesLabel || yearsLabel || 'Member'
+    const handle = yearsLabel || undefined
+
+    // No `url`: a card used to open whichever social account happened to be
+    // filled in, which meant most members were not clickable at all and the
+    // rest sent the reader off-site. Clicks open the profile modal instead.
+    return {
+      id: String(m.id),
+      image: src,
+      title: m.fullName ?? 'Member',
+      subtitle,
+      handle,
+    }
+  })
+}
+
+/** Role names in the order they are listed - first is the one held now. */
+function roleNames(member: MemberDoc): string[] {
+  const roles = member.roles as unknown
+  if (Array.isArray(roles)) {
+    return roles
+      .map((r) =>
+        typeof r === 'object' && r ? ((r as Record<string, unknown>).name as string) : null,
+      )
+      .filter((n): n is string => Boolean(n))
+  }
+  if (roles && typeof roles === 'object') {
+    const name = (roles as Record<string, unknown>).name
+    return typeof name === 'string' ? [name] : []
+  }
+  return []
+}
+
+function toModalData(member: MemberWithGeneratedAvatar): MemberModalData {
+  const photo = (member.photo as unknown as MemberPhotoDoc | null) ?? null
+  const socials = Array.isArray(member.socialAccounts)
+    ? member.socialAccounts
+        .map((s) => ({ platform: String(s?.platform ?? 'other'), url: String(s?.url ?? '') }))
+        .filter((s) => s.url)
+    : []
+
+  return {
+    id: String(member.id),
+    fullName: member.fullName ?? 'Member',
+    image: resolveImageSrc(photo) ?? fallbackAvatar(member),
+    roles: roleNames(member),
+    years: member.startYear
+      ? `${member.startYear}${member.endYear ? `–${member.endYear}` : ''}`
+      : undefined,
+    bio: member.bio ?? undefined,
+    github: member.github ?? undefined,
+    linkedin: member.linkedin ?? undefined,
+    socials,
+  }
+}
+
+/**
+ * Client presentation for the members page. Data is fetched server-side and
+ * passed in; this component owns the ChromaScene cursor effect and grouping.
+ */
+export function MembersPageContent({ members }: { members: MemberWithGeneratedAvatar[] }) {
+  const grouped = React.useMemo(() => groupByCategorySorted(members), [members])
+  const [activeId, setActiveId] = React.useState<string | null>(null)
+  const [originRect, setOriginRect] = React.useState<DOMRect | null>(null)
+
+  const byId = React.useMemo(() => {
+    const map = new Map<string, MemberDoc>()
+    for (const m of members) map.set(String(m.id), m)
+    return map
+  }, [members])
+
+  const activeMember = activeId ? byId.get(activeId) : undefined
+  const closeModal = React.useCallback(() => {
+    setActiveId(null)
+    setOriginRect(null)
+  }, [])
+
+  // The clicked card's box, so the panel can grow out of exactly that card
+  // rather than from the middle of the screen.
+  const openFromCard = React.useCallback((item: { id?: string }, rect?: DOMRect) => {
+    if (!item.id) return
+    setOriginRect(rect ?? null)
+    setActiveId(item.id)
+  }, [])
+
+  return (
+    <ChromaScene radius={300} damping={0.45} fadeOut={0.6} ease="power3.out">
+      {/* pt-16/md:pt-32 clears the pinned PageTitle, which is absolute and so
+          reserves no space of its own - same top padding every other page uses. */}
+      <div className="px-4 pt-16 pb-8 md:px-8 md:pt-32 lg:px-12">
+        <PageTitle>MEMBERS</PageTitle>
+
+        {grouped.length === 0 && <EmptyState title="No Members Yet" />}
+
+        {grouped.map(({ category, batches }) => (
+          <section key={category} className="mb-12">
+            <TextReveal
+              as="h2"
+              className="text-4xl md:text-5xl font-extrabold uppercase tracking-normal [-webkit-text-stroke:1.2px] mb-4 text-foreground"
+            >
+              {category}
+            </TextReveal>
+
+            {batches.map((batch) => (
+              <div key={batch.label} className="mb-8">
+                <div className="mb-3 flex items-center gap-3">
+                  <span className="text-sm font-semibold tracking-widest text-primary uppercase">
+                    {batch.label}
+                  </span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+                <ChromaGridWrapper
+                  className="w-full"
+                  items={toChromaItems(batch.items)}
+                  onItemClick={openFromCard}
+                  activeId={activeId}
+                />
+              </div>
+            ))}
+          </section>
+        ))}
+      </div>
+
+      {activeMember && (
+        <MemberModal
+          member={toModalData(activeMember)}
+          onClose={closeModal}
+          originRect={originRect}
+        />
+      )}
+    </ChromaScene>
+  )
+}

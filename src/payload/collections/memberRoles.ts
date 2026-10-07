@@ -1,0 +1,74 @@
+import type { CollectionConfig } from 'payload'
+import { createSortOrderBeforeChange } from '../hooks/resolveSortOrderConflicts'
+
+export const MemberRoles: CollectionConfig = {
+  slug: 'member-roles',
+  admin: { useAsTitle: 'name', group: 'Members' },
+  access: { read: () => true },
+  hooks: {
+    beforeValidate: [
+      ({ data }) => {
+        if (data?.name && !data?.slug) {
+          data.slug = data.name
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '')
+        }
+        return data
+      },
+    ],
+    beforeChange: [createSortOrderBeforeChange('member-roles')],
+    afterChange: [
+      async ({ doc, req }) => {
+        // Check for duplicates after save and notify via context
+        const allRoles = await req.payload.find({
+          collection: 'member-roles',
+          limit: 1000,
+        })
+
+        const sortOrderMap = new Map<number, string[]>()
+        for (const role of allRoles.docs) {
+          const sortOrder = Number((role as unknown as Record<string, unknown>)?.sortOrder)
+          if (!Number.isNaN(sortOrder)) {
+            if (!sortOrderMap.has(sortOrder)) {
+              sortOrderMap.set(sortOrder, [])
+            }
+            sortOrderMap
+              .get(sortOrder)
+              ?.push(((role as unknown as Record<string, unknown>)?.name as string) || 'Unnamed')
+          }
+        }
+
+        // Check if there are duplicates
+        const hasDuplicates = Array.from(sortOrderMap.values()).some((names) => names.length > 1)
+
+        if (hasDuplicates) {
+          // Store in context for client-side toast
+          req.context = req.context || {}
+          req.context.hasDuplicateSortOrders = true
+        }
+
+        return doc
+      },
+    ],
+  },
+  fields: [
+    { name: 'name', type: 'text', required: true, unique: true },
+    { name: 'slug', type: 'text', required: true, unique: true },
+    { name: 'description', type: 'textarea' },
+    {
+      name: 'sortOrder',
+      type: 'number',
+      required: true,
+      admin: {
+        description: 'Position in the list. Lower numbers appear first.',
+        components: {
+          Field: '@/components/admin/sortOrderSelectRole',
+        },
+      },
+    },
+  ],
+}

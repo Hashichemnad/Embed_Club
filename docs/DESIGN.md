@@ -1,0 +1,83 @@
+# Design
+
+## Theme
+
+Dark-first with a light mode via `next-themes` (`.dark` class strategy). The scene: a student checking the club site on a phone in a dim electronics lab between classes - dark base, warm copper accents like solder under bench light. A subtle `fabric-of-squares` texture overlays surfaces site-wide.
+
+**Color strategy: Committed** - copper carries identity across links, active states, badges, fills, and glows on a graphite-black base.
+
+## Colors
+
+Tokens are shadcn-style HSL triplets in `src/app/(frontend)/globals.css`.
+
+### Dark (default experience)
+
+| Role | Value | Notes |
+|---|---|---|
+| `--background` | `20 14.3% 4.1%` | graphite near-black (#0c0a09) |
+| `--foreground` | `36 30% 96%` | warm off-white |
+| `--primary` | `29 65% 57%` | **copper** #d98e4a - buttons, links, active nav, logo fill |
+| `--primary-foreground` | `20 14.3% 4.1%` | near-black on copper |
+| `--accent` | `29 40% 16%` | deep copper tint - hovers, selected surfaces |
+| `--ring` | `29 65% 57%` | copper focus rings |
+| `--border` | `29 20% 14%` | copper-tinted border instead of pure white/5 |
+
+### Light
+
+| Role | Value | Notes |
+|---|---|---|
+| `--background` | `36 30% 97%` | warm off-white |
+| `--foreground` | `20 14.3% 8%` | near-black |
+| `--primary` | `28 67% 38%` | deep copper #a05a20 (AA on light bg) |
+| `--accent` | `29 50% 90%` | pale copper tint |
+
+### Rules
+
+- No raw hex in components - use tokens. Legacy hard-coded `#0070f3` / `rgba(0,112,243,…)` blues are replaced by `--primary` / copper rgba.
+- Glows: copper at low alpha (`rgba(217,142,74,0.3)`), never blue.
+- Body text ≥4.5:1 against background in both themes; `muted-foreground` is for metadata only, never paragraphs.
+
+## Typography
+
+| Use | Font | Source |
+|---|---|---|
+| Body / UI | TeX Gyre Adventor (regular 400 / bold 700) | `next/font/local`, `--font-tex-gyre-adventor` |
+| Display / logo lockups | TeX Gyre Adventor (temporary) | A licensed display face is still to be chosen |
+
+- Page titles: uppercase, absolute-positioned top-left (`text-2xl` mobile → `text-4xl` desktop) - an established site signature.
+- Body line-length ≤75ch; `text-wrap: balance` on headings.
+- Display letter-spacing never tighter than `-0.04em`.
+- TeX Gyre Adventor is the open-source site-wide body and UI font. Preserve the
+  existing hierarchy: supporting copy uses regular (400), the default body
+  remains medium (500), and primary headers use extra-bold (800), synthesized
+  from the bundled bold (700) face.
+
+## Components
+
+- **Shells**: `SidebarShell` (desktop sidebar nav + mobile menu + intro overlay) → `MainbarShell` (rounded content panel with its own scroll container). All frontend pages nest inside both.
+- **Cards**: `CutoutCard` is the standard content card for Resources/Tutorials - masked-corner cutout with inset label; `featured` and auto-`NEW` badges come from Payload. Gallery uses masonry; events use a carousel and focus cards; projects use a showcase layout.
+- **Intro**: logo fill + banner slide choreography on the home page (`SidebarShell`), scales to the viewport on mobile, and controls when the landing page is revealed. Background audio has its own visible toggle.
+- **Buttons**: shadcn `Button` + animate-ui `FlipButton` for icon toggles (theme, audio) - flip-on-hover from bottom.
+- **Texture**: `.texture-panel` class in `globals.css` (`/textures/fabric-of-squares.png`) on the content panel, sidebar, and menu flyout - a real background layer, blend-mode tuned per theme (`multiply` light, `overlay` dark).
+- **Block-based CMS content** is rendered via `BlockRenderer` and supports text, code (Shiki), tables, graphs (Mermaid), images, videos, accordions, rows, and simulator links.
+
+## Layout
+
+- Mobile-first: single column at ~390px, content panels edge-to-edge (borderless) on mobile.
+- Desktop: fixed left sidebar, rounded main panel with internal scroll; theme + audio toggles top-right.
+- Card grids: `repeat(auto-fit, minmax(280px, 1fr))` - no breakpoint ladders.
+- Spacing rhythm varies: generous between sections (py-16+), tight inside groups.
+
+## Motion
+
+- Signature: intro logo fill → banner slide → landing-page reveal (motion/react). Runs on the home page; `prefers-reduced-motion` gets an instant reveal.
+- Micro: FlipButton hover flips, card hover scale (1.05) + copper glow, tab underline spring.
+- Ease-out expo/quart everywhere; no bounce.
+- Mermaid diagrams and heavy libs load lazily - motion never blocks content.
+
+## Anti-patterns (site-specific bans)
+
+- Icon + heading + text card grids repeated per section.
+- Tiny uppercase tracked kicker above every section; numbered 01/02/03 section markers.
+- Blue-glow "tech" accents; gradient text; glassmorphism-by-default.
+- Fixed pixel widths that overflow 390px viewports (the intro logo bug - since fixed).

@@ -1,0 +1,90 @@
+import {
+  type SimulatorCardData,
+  SimulatorsPageContent,
+} from '@/app/(frontend)/simulators/simulatorsPageContent'
+import { PageTitle } from '@/components/common/pageTitle'
+import { MainbarShell, SidebarShell } from '@/components/layout/frontendShell'
+import config from '@/payload/payload.config'
+import { getPayload } from 'payload'
+
+// ISR: rebuild this page at most every 60s so CMS edits show up without a redeploy
+export const revalidate = 60
+
+async function getSimulators(): Promise<SimulatorCardData[]> {
+  try {
+    const payload = await getPayload({ config })
+
+    const simulators = await payload.find({
+      collection: 'simulators',
+      depth: 1,
+      limit: 100,
+      pagination: false,
+      // Drag-arranged order from the admin list view, top row first
+      sort: '_order',
+    })
+
+    if (!simulators.docs || simulators.docs.length === 0) {
+      return []
+    }
+
+    // Transform Payload simulators to SimulatorCardData format
+    return simulators.docs.map((simulator) => {
+      let imageUrl = '/placeholder/placeholder.webp'
+
+      if (simulator.thumbnail) {
+        if (
+          typeof simulator.thumbnail === 'object' &&
+          simulator.thumbnail !== null &&
+          simulator.thumbnail.url
+        ) {
+          imageUrl = simulator.thumbnail.url
+        } else if (typeof simulator.thumbnail === 'number') {
+          imageUrl = `/api/media/file/${simulator.thumbnail}`
+        }
+      }
+
+      const tags = Array.isArray(simulator.tags)
+        ? simulator.tags
+            .map((tag) => (typeof tag === 'object' && tag !== null ? tag.name : null))
+            .filter((name): name is string => Boolean(name))
+        : []
+
+      return {
+        id: String(simulator.id),
+        title: simulator.title || '',
+        description: simulator.description || '',
+        image: imageUrl,
+        tags,
+        slug: simulator.slug || '',
+        difficulty: simulator.difficulty || undefined,
+        estimatedTime: simulator.estimatedTime ?? undefined,
+        createdAt: simulator.createdAt,
+        launchUrl: simulator.launchUrl || undefined,
+        launchType: simulator.launchType || undefined,
+        videoUrl: simulator.videoUrl || undefined,
+        content: simulator.content,
+      }
+    })
+  } catch (error) {
+    console.error('[Simulators] Error fetching from Payload:', error)
+    // Rethrow: an empty list here would render as "nothing published yet",
+    // which is a different thing than the query having failed. The route
+    // error boundary shows the outage and offers a retry.
+    throw error
+  }
+}
+
+export default async function Page() {
+  const simulators = await getSimulators()
+
+  return (
+    <SidebarShell>
+      <MainbarShell>
+        <PageTitle>SIMULATORS</PageTitle>
+        <div className="h-full w-full px-2 pt-16 md:pt-32">
+          <SimulatorsPageContent simulators={simulators} />
+        </div>
+      </MainbarShell>
+    </SidebarShell>
+  )
+}

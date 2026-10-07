@@ -1,0 +1,145 @@
+'use client'
+
+import {
+  CutoutCardInsetLabel,
+  CutoutCorner,
+  cutoutCardSurfaceShadowClassName,
+} from '@/components/common/cutoutCard'
+import { useImagePainted } from '@/components/common/imageWithSkeleton'
+import { GalleryPhotoModal } from '@/components/features/gallery/photoModal'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+import { motion, useReducedMotion } from 'motion/react'
+import type React from 'react'
+import { useCallback, useRef, useState } from 'react'
+
+export interface MasonryItem {
+  id: string
+  img: string
+  url: string
+  height: number
+  width: number
+  caption?: string
+}
+
+interface MasonryProps {
+  items: MasonryItem[]
+}
+
+/**
+ * True column masonry: a CSS multi-column flow. Each photo keeps its natural
+ * aspect ratio, so tall and wide images pack into whatever column has room -
+ * they land wherever they fit, never forced into a uniform grid. Every photo
+ * is a cutout card (notched corners + inset caption strip) and the image -
+ * not the card - zooms on hover.
+ */
+function MasonryCard({
+  item,
+  index,
+  onOpen,
+  isActive,
+}: {
+  item: MasonryItem
+  index: number
+  onOpen: (item: MasonryItem, rect: DOMRect) => void
+  /** True while this card's own modal is open. */
+  isActive?: boolean
+}) {
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [loaded, setLoaded] = useImagePainted(imgRef, item.img)
+  const reduceMotion = useReducedMotion()
+  const aspectRatio = item.width > 0 && item.height > 0 ? item.width / item.height : 1
+
+  return (
+    <motion.div
+      className="mb-4 break-inside-avoid"
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '0px 0px -40px 0px' }}
+      transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1], delay: (index % 8) * 0.04 }}
+    >
+      <button
+        type="button"
+        onClick={(e) => onOpen(item, e.currentTarget.getBoundingClientRect())}
+        className={cn(
+          'group/cutout relative block w-full cursor-pointer overflow-hidden rounded-2xl bg-card p-0 outline-none',
+          cutoutCardSurfaceShadowClassName,
+          // Hidden, not unmounted: the panel morphs out of this card's box, so
+          // leaving a copy underneath reads as duplication. Keeps its column
+          // space, so the masonry doesn't reflow while the modal is open.
+          isActive && 'opacity-0',
+        )}
+      >
+        <div className="relative w-full" style={{ aspectRatio }}>
+          <img
+            ref={imgRef}
+            src={item.img}
+            alt={item.caption || ''}
+            aria-hidden={!item.caption}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setLoaded(true)}
+            onError={() => setLoaded(true)}
+            className={cn(
+              'absolute inset-0 h-full w-full object-cover',
+              loaded ? 'opacity-100' : 'opacity-0',
+            )}
+          />
+          {!loaded && <Skeleton className="absolute inset-0 h-full w-full" />}
+        </div>
+
+        {item.caption && (
+          <CutoutCardInsetLabel className="bottom-0 left-0 max-w-[85%] rounded-tr-[16px] bg-card px-4 py-2.5 text-left">
+            <span className="block text-sm font-medium normal-case text-foreground line-clamp-2">
+              {item.caption}
+            </span>
+            <CutoutCorner className="absolute -right-[27px] -bottom-px rotate-90 text-card" />
+            <CutoutCorner className="absolute -top-[27px] -left-px rotate-90 text-card" />
+          </CutoutCardInsetLabel>
+        )}
+      </button>
+    </motion.div>
+  )
+}
+
+const Masonry: React.FC<MasonryProps> = ({ items }) => {
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [originRect, setOriginRect] = useState<DOMRect | null>(null)
+
+  // Held by id rather than by object: the photo stays resolvable while the
+  // closing animation plays, and a stale card reference can't outlive a
+  // re-render of the list.
+  const active = items.find((item) => item.id === activeId) ?? null
+
+  const openFromCard = useCallback((item: MasonryItem, rect: DOMRect) => {
+    setOriginRect(rect)
+    setActiveId(item.id)
+  }, [])
+
+  return (
+    <>
+      <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
+        {items.map((item, index) => (
+          <MasonryCard
+            key={item.id}
+            item={item}
+            index={index}
+            onOpen={openFromCard}
+            isActive={item.id === activeId}
+          />
+        ))}
+      </div>
+
+      <GalleryPhotoModal
+        photo={active}
+        open={Boolean(active)}
+        onOpenChange={(open) => {
+          if (!open) setActiveId(null)
+        }}
+        originRect={originRect}
+      />
+    </>
+  )
+}
+
+export default Masonry

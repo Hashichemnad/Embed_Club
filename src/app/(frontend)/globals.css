@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  :root {
+    /* Solder & Copper light theme - warm off-white base, deep copper accents */
+    --background: 36 30% 97%;
+    --foreground: 20 14.3% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14.3% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14.3% 8%;
+    --primary: 28 67% 38%;
+    --primary-foreground: 36 30% 97%;
+    --secondary: 32 25% 92%;
+    --secondary-foreground: 20 14.3% 10%;
+    --muted: 32 25% 92%;
+    --muted-foreground: 25 8% 38%;
+    --accent: 29 50% 90%;
+    --accent-foreground: 28 67% 28%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 60 9.1% 97.8%;
+    --border: 30 20% 85%;
+    --input: 30 20% 85%;
+    --ring: 28 67% 38%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    /* Solder & Copper dark theme - graphite base, copper #d98e4a accents */
+    --background: 20 14.3% 4.1%;
+    --foreground: 36 30% 96%;
+    --card: 20 14% 5.5%;
+    --card-foreground: 36 30% 96%;
+    --popover: 20 14% 5.5%;
+    --popover-foreground: 36 30% 96%;
+    --primary: 29 65% 57%;
+    --primary-foreground: 20 14.3% 4.1%;
+    --secondary: 22 12% 12%;
+    --secondary-foreground: 36 30% 96%;
+    --muted: 22 12% 12%;
+    --muted-foreground: 30 10% 66%;
+    --accent: 29 40% 16%;
+    --accent-foreground: 32 70% 85%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 60 9.1% 97.8%;
+    --border: 29 20% 14%;
+    --input: 29 20% 14%;
+    --ring: 29 65% 57%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Fabric-of-squares grain as a real background layer: zero layout impact,
+   scrolls with content (attachment: local), tiles infinitely. The texture PNG
+   is a ~11% light-grey pattern. Light mode multiplies it into the surface so
+   the grain reads as faint darker specks. Dark mode composites it normally so
+   the same semi-transparent light pattern LIFTS the near-black surface -
+   `overlay`/`multiply` on a near-black base crush it to invisible. */
+.texture-panel {
+  background-image: url("/textures/fabric-of-squares.png");
+  background-repeat: repeat;
+  background-attachment: local;
+  background-blend-mode: multiply;
+}
+
+/* Keep server-rendered home content behind the intro until the client has
+   completed the logo choreography. This prevents the page from flashing first
+   while the intro overlay is still hydrating. */
+.home-content-gated {
+  transition: opacity 0.25s ease;
+}
+
+html:not([data-intro-ready="true"]) .home-content-gated {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+.dark .texture-panel {
+  background-blend-mode: overlay;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) hsl(var(--background));
+}
+
+*::-webkit-scrollbar {
+  background-color: hsl(var(--background));
+  width: 4px;
+}
+
+/* background of the scrollbar except button or resizer */
+*::-webkit-scrollbar-track {
+  background-color: hsl(var(--background));
+}
+
+/* scrollbar itself */
+*::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary) / 0.6);
+  border-radius: 16px;
+}
+
+/* set button(top and bottom of the scrollbar) */
+*::-webkit-scrollbar-button {
+  display: none;
+}

@@ -1,0 +1,483 @@
+'use client'
+import {
+  CutoutCardInsetLabel,
+  CutoutCardPin,
+  CutoutCorner,
+  cutoutCardSurfaceShadowClassName,
+} from '@/components/common/cutoutCard'
+import { EventDetails } from '@/components/features/events/eventDetails'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useCardMorph } from '@/hooks/useCardMorph'
+import { useOutsideClick } from '@/hooks/useOutsideClick'
+import { isNewEvent } from '@/lib/eventUtils'
+import { cn } from '@/lib/utils'
+import type { Event } from '@/payload/payload-types'
+import { X } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
+import type { ImageProps } from 'next/image'
+import type React from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+type EventCardData = {
+  src: string
+  title: string
+  category: string
+  content: React.ReactNode
+}
+
+export const CarouselContext = createContext<{
+  onCardClose: (index: number) => void
+  currentIndex: number
+}>({
+  onCardClose: () => {},
+  currentIndex: 0,
+})
+
+export const Card = ({
+  card,
+  index,
+  layout = false,
+  event,
+}: {
+  card: EventCardData
+  index: number
+  layout?: boolean
+  event?: Event
+}) => {
+  const [open, setOpen] = useState(false)
+  // The card's box, so the panel can grow out of exactly this card.
+  const [originRect, setOriginRect] = useState<DOMRect | null>(null)
+  const { onCardClose } = useContext(CarouselContext)
+
+  /**
+   * The grid card this panel grew out of, hidden while the modal is open.
+   *
+   * Held as a node rather than as state because it belongs to a different
+   * component tree - the grid renders from the page, the carousel from here,
+   * and there is no shared owner between them short of lifting the open state
+   * out of this card entirely. The carousel copy stays visible: it is the one
+   * on screen, and the panel does not come out of it.
+   */
+  const hiddenGridCard = useRef<HTMLElement | null>(null)
+
+  // Escape, outside clicks and the scroll lock live in the panel now: it owns
+  // the closing animation, and routing them through here skipped it.
+
+  const handleOpen = (e: React.MouseEvent<HTMLElement>) => {
+    // The carousel is a showcase of events that are also listed in the grid
+    // below, so the modal grows out of the real card down there rather than
+    // out of this copy of it. That card is usually below the fold, which is
+    // what gives the panel its rise from underneath.
+    //
+    // Falls back to the carousel card when there is no counterpart - the grid
+    // is paginated, so the event may be on another page.
+    const gridCard =
+      event?.id != null
+        ? document.querySelector<HTMLElement>(`[data-event-id="${event.id}"]`)
+        : null
+
+    if (gridCard) {
+      gridCard.style.opacity = '0'
+      hiddenGridCard.current = gridCard
+    }
+
+    setOriginRect((gridCard ?? e.currentTarget).getBoundingClientRect())
+    setOpen(true)
+  }
+
+  const restoreGridCard = () => {
+    if (!hiddenGridCard.current) return
+    hiddenGridCard.current.style.opacity = ''
+    hiddenGridCard.current = null
+  }
+
+  // Paging the grid or navigating away while a panel is open would otherwise
+  // strand a card at zero opacity. Reads the ref inside the cleanup rather
+  // than closing over the helper, which would have to be a dependency.
+  useEffect(() => {
+    const held = hiddenGridCard
+    return () => {
+      if (held.current) {
+        held.current.style.opacity = ''
+        held.current = null
+      }
+    }
+  }, [])
+
+  const handleClose = () => {
+    restoreGridCard()
+    setOpen(false)
+    setOriginRect(null)
+    onCardClose(index)
+  }
+
+  return (
+    <>
+      <EventModal
+        open={open}
+        onClose={handleClose}
+        card={card}
+        event={event}
+        originRect={originRect}
+        layoutId={layout ? `card-${card.title}` : undefined}
+      />
+
+      {/* Carousel card - same cutout shell as the grid below it: notched
+          inset title strip, notched New pin, 16px radius. */}
+      <motion.button
+        layoutId={layout ? `card-${card.title}` : undefined}
+        onClick={handleOpen}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className={cn(
+          'group/cutout relative z-10 flex h-80 w-56 flex-col items-start justify-start overflow-hidden rounded-2xl bg-card p-0 outline-none md:h-[40rem] md:w-96',
+          cutoutCardSurfaceShadowClassName,
+        )}
+      >
+        <BlurImage
+          src={card.src}
+          alt={card.title}
+          fill
+          className="absolute inset-0 z-10 object-cover"
+        />
+        <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-t from-background/35 via-transparent to-transparent dark:from-background/50" />
+
+        {isNewEvent(event?.eventDate) && (
+          <CutoutCardPin className="top-0 right-0 z-40 rounded-bl-[16px] bg-primary px-3 py-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-primary-foreground">
+              New
+            </span>
+            <CutoutCorner className="absolute -left-[27px] -top-px -rotate-90 text-primary" />
+            <CutoutCorner className="absolute -bottom-[27px] -right-px -rotate-90 text-primary" />
+          </CutoutCardPin>
+        )}
+
+        <CutoutCardInsetLabel className="bottom-0 left-0 z-40 max-w-[85%] rounded-tr-[16px] bg-card px-4 py-3 text-left">
+          <motion.p
+            layoutId={layout ? `category-${card.category}` : undefined}
+            className="text-left font-sans text-[11px] font-semibold uppercase tracking-widest text-primary"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            {card.category}
+            {event?.eventMode === 'online' && ' · Online'}
+          </motion.p>
+          <motion.p
+            layoutId={layout ? `title-${card.title}` : undefined}
+            className="mt-1 font-sans text-base font-semibold [text-wrap:balance] text-foreground md:text-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+          >
+            {card.title}
+          </motion.p>
+          <CutoutCorner className="absolute -right-[27px] -bottom-px rotate-90 text-card" />
+          <CutoutCorner className="absolute -top-[27px] -left-px rotate-90 text-card" />
+        </CutoutCardInsetLabel>
+      </motion.button>
+    </>
+  )
+}
+
+export const EventModal = ({
+  open,
+  onClose,
+  card,
+  event,
+  layoutId,
+  originRect,
+}: {
+  open: boolean
+  onClose: () => void
+  card: EventCardData
+  event?: Event
+  layoutId?: string
+  /** The clicked card's box, so the panel can grow out of it. */
+  originRect?: DOMRect | null
+}) => {
+  // Rendered into <body> rather than in place. `position: fixed` is only
+  // relative to the viewport while no ancestor is transformed - and Embla
+  // moves the carousel by writing `transform: translate3d(...)` on the slide
+  // track, which makes that track the containing block for anything fixed
+  // inside it. Opening a card from the carousel therefore drew the whole modal
+  // inside one slide, clipped by the track's overflow-hidden. The grid below
+  // was fine only because nothing there is transformed.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  // Nothing rendered until it is open: the morph measures the panel in a layout
+  // effect, so the panel has to exist the moment that effect runs.
+  if (!mounted || !open) return null
+
+  // `items-start` + `my-auto` on the panel, not `items-center`: a centred flex
+  // child taller than its container overflows equally both ways and the top
+  // half becomes unreachable - no amount of scrolling gets back to it. This
+  // still centres a short modal and scrolls a tall one from its actual top.
+  // The env() padding keeps it clear of the notch and the gesture bar.
+  return createPortal(
+    <EventModalPanel
+      onClose={onClose}
+      card={card}
+      event={event}
+      layoutId={layoutId}
+      originRect={originRect}
+    />,
+    document.body,
+  )
+}
+
+/** The panel itself. Split out so it mounts and unmounts with the open flag. */
+const EventModalPanel = ({
+  onClose,
+  card,
+  event,
+  layoutId,
+  originRect,
+}: {
+  onClose: () => void
+  card: EventCardData
+  event?: Event
+  layoutId?: string
+  originRect?: DOMRect | null
+}) => {
+  const reduceMotion = useReducedMotion()
+  const { panelRef, innerRef, bodyRef, overlayRef, requestClose } = useCardMorph({
+    originRect,
+    onClose,
+    reduceMotion,
+  })
+
+  useOutsideClick(panelRef, requestClose)
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') requestClose()
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = 'auto'
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [requestClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-auto px-4 md:px-6"
+      style={{
+        paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+      }}
+    >
+      {/* Blur from md up only: backdrop-filter is re-evaluated every frame
+              while the panel moves across it, which is costly on a weak phone. */}
+      <motion.div
+        ref={overlayRef}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        className="fixed inset-0 h-full w-full bg-black/80 md:backdrop-blur-lg"
+      />
+      <div
+        ref={panelRef}
+        style={{ opacity: 0 }}
+        className={cn(
+          // `svh`, not `vh`: mobile browsers size `vh` as though the URL bar
+          // were hidden, so a 90vh panel is taller than what is actually on
+          // screen and its top sits under the browser chrome.
+          //
+          // A fixed height, not a max: the panel used to size to its content,
+          // so expanding the description grew the frame under the reader and a
+          // short event opened a different-sized modal than a long one. Now
+          // every event's modal is the same box and the content moves inside
+          // it. This also gives the grid a definite height to resolve `h-full`
+          // and its `fr` row against.
+          'relative z-[60] my-auto h-[85svh] w-full max-w-6xl overflow-hidden rounded-2xl bg-card font-sans text-card-foreground md:h-[90svh]',
+          cutoutCardSurfaceShadowClassName,
+        )}
+      >
+        {/* Counter-scaled against the panel, so the content holds its true
+                proportions while the frame morphs. */}
+        <div ref={innerRef} className="h-full w-full">
+          <button
+            type="button"
+            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 opacity-90 shadow-sm backdrop-blur-sm transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            onClick={requestClose}
+            aria-label="Close modal"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Desktop: the grid itself doesn't scroll - the details column does,
+              so the poster stays put while its details move. Below md the two
+              are stacked, where a fixed image and a scrolling column beside it
+              means nothing, so the whole panel scrolls as one.
+              `minmax(0,1fr)` on the row: a default `auto` row sizes to its
+              tallest child and would push past the panel instead of letting the
+              column scroll inside it. */}
+          <div
+            ref={bodyRef}
+            className="grid h-full grid-cols-1 gap-6 overflow-y-auto p-3 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)] md:gap-8 md:overflow-hidden md:p-8 lg:p-10"
+          >
+            {/* Image Section - same cutout inset label as the card it opened from */}
+            <div className="relative flex h-full min-h-[16rem] items-stretch justify-center overflow-hidden rounded-2xl bg-muted">
+              <BlurImage src={card.src} alt={card.title} fill className="object-contain" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-transparent" />
+
+              <CutoutCardInsetLabel className="bottom-0 left-0 z-10 max-w-[85%] rounded-tr-[16px] bg-card px-4 py-3 text-left">
+                <motion.p
+                  layoutId={layoutId ? `category-${card.category}` : undefined}
+                  className="text-left text-[11px] font-semibold uppercase tracking-widest text-primary"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {card.category}
+                </motion.p>
+                <motion.p
+                  layoutId={layoutId ? `title-${card.title}` : undefined}
+                  className="mt-1 text-base font-semibold text-foreground md:text-xl [text-wrap:balance]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                >
+                  {card.title}
+                </motion.p>
+                <CutoutCorner className="absolute -right-[27px] -bottom-px rotate-90 text-card" />
+                <CutoutCorner className="absolute -top-[27px] -left-px rotate-90 text-card" />
+              </CutoutCardInsetLabel>
+            </div>
+
+            {/* Details Section - the scrolling half on desktop. `min-h-0` is
+                what allows it: a grid item's default `min-height: auto` refuses
+                to shrink below its content, so without it the column grows to
+                fit and the overflow moves back up to the panel. */}
+            <div className="flex min-h-0 flex-col justify-start space-y-4 md:space-y-6 md:overflow-y-auto md:pr-2">
+              {/* Content (Event Details) */}
+              <div className="flex-1 pr-4">
+                {event ? <EventDetails event={event} /> : card.content}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const BlurImage = ({ height, width, src, className, alt, fill, ...rest }: ImageProps) => {
+  const [isLoading, setLoading] = useState(true)
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  // The blur must never outlive the image, and `onLoad` alone can't guarantee
+  // that: a cached image is already `complete` before React attaches the
+  // handler, and our CDN images can stay `complete === false` indefinitely even
+  // once they have decoded and painted. So drive the state off the element -
+  // `decode()` settles as soon as the bitmap is usable, and resolves
+  // immediately for an already-decoded one. Rejection (decode error, or the
+  // src being swapped mid-flight) also clears, since a stuck blur is worse
+  // than an unblurred broken image.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run per src
+  useEffect(() => {
+    const img = imgRef.current
+    if (!img) return
+    // `naturalWidth`, not `complete`: a lazy image restored from cache inside
+    // the carousel's overflow-hidden track can sit at `complete === false`
+    // forever, with neither `load` nor `decode()` ever settling - but it has
+    // real dimensions and paints fine. Dimensions mean there is a bitmap.
+    if (img.naturalWidth > 0) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    const timers: { poll?: ReturnType<typeof setInterval> } = {}
+    const clear = () => {
+      if (timers.poll) clearInterval(timers.poll)
+      if (!cancelled) setLoading(false)
+    }
+    img.decode().then(clear, clear)
+    // Those same carousel images only reach `naturalWidth > 0` *after* mount,
+    // without ever settling `decode()` or firing `load`, so polling is the one
+    // signal that catches them. It stops the moment there are pixels.
+    timers.poll = setInterval(() => {
+      if (img.naturalWidth > 0) clear()
+    }, 250)
+    return () => {
+      cancelled = true
+      if (timers.poll) clearInterval(timers.poll)
+    }
+  }, [src])
+
+  return (
+    <>
+      <img
+        ref={imgRef}
+        className={cn(
+          'h-full w-full transition duration-300',
+          // No filter class once loaded, rather than `blur-0`. `blur(0px)` is not
+          // `none`: it still promotes the image to its own composited layer and
+          // routes it through the filter pipeline, and stacked with the card's
+          // transition-transform and Embla's translate3d on the track, Chrome
+          // rasterises that layer at the wrong scale - leaving the image
+          // permanently soft long after it has finished loading. The grid cards
+          // never set a filter, which is why only the carousel looked blurry.
+          isLoading && 'blur-sm',
+          className,
+        )}
+        onLoad={() => setLoading(false)}
+        // A broken image must not stay blurred behind a permanent placeholder.
+        onError={() => setLoading(false)}
+        src={src as string}
+        width={width}
+        height={height}
+        loading="lazy"
+        decoding="async"
+        alt={alt || ''}
+        aria-hidden={!alt}
+        {...rest}
+      />
+      {/* Deliberately not given the image's own classes: the image is what sits
+          on top, so a placeholder that outlived a stuck load can never hide it. */}
+      {isLoading && <Skeleton className="absolute inset-0 h-full w-full" />}
+    </>
+  )
+}
+
+export type { EventCardData }
+
+/**
+ * Helper function to convert Event data to Card type
+ * Extracts image URL and basic info from Event collection
+ */
+export const eventToCard = (event: Event): EventCardData => {
+  const imageUrl =
+    typeof event.image === 'object' && event.image !== null && 'url' in event.image
+      ? event.image.url || '/placeholder/placeholder.webp'
+      : '/placeholder/placeholder.webp'
+
+  return {
+    src: imageUrl,
+    title: event.title || 'Untitled Event',
+    category: event.category || 'Event',
+    content: <EventDetails event={event} />,
+  }
+}
+
+/**
+ * EventCard - Reusable card component for displaying event information
+ * Combines Card UI with Event data
+ */
+export const EventCard = ({
+  event,
+  index,
+  layout = false,
+}: {
+  event: Event
+  index: number
+  layout?: boolean
+}) => {
+  const card = eventToCard(event)
+
+  return <Card card={card} index={index} layout={layout} event={event} />
+}

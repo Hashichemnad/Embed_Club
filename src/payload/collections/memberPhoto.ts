@@ -1,0 +1,57 @@
+import { rewriteUploadUrls } from '@/lib/mediaUrl'
+import type { CollectionConfig } from 'payload'
+
+export const MemberPhoto: CollectionConfig = {
+  slug: 'member-photo',
+  admin: { group: 'Members' },
+  access: { read: () => true },
+  hooks: {
+    // Serve member photos from the Supabase public CDN (same bucket as media).
+    afterRead: [rewriteUploadUrls],
+  },
+  fields: [
+    {
+      name: 'alt',
+      label: 'Alt Text',
+      type: 'text',
+      required: true,
+      admin: { description: 'e.g., "Photo of John Doe"' },
+    },
+  ],
+  upload: {
+    staticDir: 'media/members',
+    imageSizes: [
+      {
+        name: 'thumbnail',
+        width: 150,
+        height: 150,
+        position: 'centre',
+        formatOptions: { format: 'webp', options: { quality: 80 } },
+      },
+      {
+        name: 'card',
+        width: 400,
+        height: 400,
+        position: 'centre',
+        formatOptions: { format: 'webp', options: { quality: 80 } },
+      },
+      {
+        name: 'profile',
+        width: 800,
+        height: 800,
+        position: 'centre',
+        formatOptions: { format: 'webp', options: { quality: 80 } },
+      },
+    ],
+    adminThumbnail: 'thumbnail',
+    mimeTypes: ['image/*'],
+    formatOptions: {
+      format: 'webp',
+      options: {
+        quality: 80,
+      },
+    },
+  },
+}
+
+export default MemberPhoto

@@ -46,6 +46,7 @@ import * as migration_20260922_190000_reconcile_schema_drift from './20260922_19
 import * as migration_20260924_120000_add_build_link_block from './20260924_120000_add_build_link_block';
 import * as migration_20260929_150324_allow_null_media_relations from './20260929_150324_allow_null_media_relations';
 import * as migration_20261007_163408_payload_3_90_upgrade from './20261007_163408_payload_3_90_upgrade';
+import * as migration_20261007_195119_s3_object_key from './20261007_195119_s3_object_key';
 
 export const migrations = [
   {
@@ -286,6 +287,11 @@ export const migrations = [
   {
     up: migration_20261007_163408_payload_3_90_upgrade.up,
     down: migration_20261007_163408_payload_3_90_upgrade.down,
-    name: '20261007_163408_payload_3_90_upgrade'
+    name: '20261007_163408_payload_3_90_upgrade',
+  },
+  {
+    up: migration_20261007_195119_s3_object_key.up,
+    down: migration_20261007_195119_s3_object_key.down,
+    name: '20261007_195119_s3_object_key'
   },
 ];

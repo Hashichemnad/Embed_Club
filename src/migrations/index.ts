@@ -44,9 +44,11 @@ import * as migration_20260922_110000_add_learning_source from './20260922_11000
 import * as migration_20260922_140000_add_build_targets from './20260922_140000_add_build_targets';
 import * as migration_20260922_190000_reconcile_schema_drift from './20260922_190000_reconcile_schema_drift';
 import * as migration_20260924_120000_add_build_link_block from './20260924_120000_add_build_link_block';
+import * as migration_20260924_200000_forms_parity_and_certificates from './20260924_200000_forms_parity_and_certificates';
 import * as migration_20260929_150324_allow_null_media_relations from './20260929_150324_allow_null_media_relations';
 import * as migration_20261007_163408_payload_3_90_upgrade from './20261007_163408_payload_3_90_upgrade';
 import * as migration_20261007_195119_s3_object_key from './20261007_195119_s3_object_key';
+import * as migration_20261115_120000_add_google_forms_forwarding from './20261115_120000_add_google_forms_forwarding';
 
 export const migrations = [
   {
@@ -280,6 +282,11 @@ export const migrations = [
     name: '20260924_120000_add_build_link_block',
   },
   {
+    up: migration_20260924_200000_forms_parity_and_certificates.up,
+    down: migration_20260924_200000_forms_parity_and_certificates.down,
+    name: '20260924_200000_forms_parity_and_certificates',
+  },
+  {
     up: migration_20260929_150324_allow_null_media_relations.up,
     down: migration_20260929_150324_allow_null_media_relations.down,
     name: '20260929_150324_allow_null_media_relations',
@@ -292,6 +299,11 @@ export const migrations = [
   {
     up: migration_20261007_195119_s3_object_key.up,
     down: migration_20261007_195119_s3_object_key.down,
-    name: '20261007_195119_s3_object_key'
+    name: '20261007_195119_s3_object_key',
+  },
+  {
+    up: migration_20261115_120000_add_google_forms_forwarding.up,
+    down: migration_20261115_120000_add_google_forms_forwarding.down,
+    name: '20261115_120000_add_google_forms_forwarding',
   },
 ];

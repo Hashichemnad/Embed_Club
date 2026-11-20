@@ -33,8 +33,9 @@ rotate yearly, and none of them should need a developer to add an event.
 ## Design language, in one paragraph
 
 **"Solder & Copper"** - copper (`#d98e4a` dark / `#a05a20` light) on graphite
-or warm white, with a fabric-of-squares texture on panels. Fonts are ITC Avant
-Garde for body and Gobold + Sport Break for display. The signature UI object is
+or warm white, with a fabric-of-squares texture on panels. The font is TeX Gyre
+Adventor for body, UI and (until a licensed display face is chosen) display too;
+the earlier ITC Avant Garde, Gobold and Sport Break were removed. The signature UI object is
 the **cutout card**: notched corners, an inset label strip, an image that zooms
 on hover. Colors only ever come from CSS tokens. Full rules, including the list
 of banned patterns, are in [DESIGN.md](DESIGN.md) and AGENTS.md §1.
@@ -117,6 +118,41 @@ Schema is migration-managed. The workflow is in SETUP.md §4. Two cautions:
 ---
 
 ## Change history
+
+### 2026-11 - Embed Days: Embedthon and Embers '26
+
+Two event pages and a chooser, built for the 24-25 November 2026 events.
+
+- `/embed-days` lists Embers '26 as one cutout card (same style as Resources and
+  Tutorials) inside the normal sidebar shell. Opening it slides the shell away
+  under a sheet of copper that `embers/loading.tsx` keeps up until the page has
+  loaded, and `CopperPageReveal` then breaks it into pixels, so the logo loader
+  never shows. Embedthon is no longer listed there (its `/embedthon` route still
+  exists). Listed in the desktop and mobile menus and in the sitemap.
+- `/embedthon` (agentic AI workshop plus 24-hour hackathon, 2nd year CSE) and
+  `/embers` (national level technical fest) share one full-bleed page,
+  `EmbedthonPageContent`, switched by an `event` prop. They deliberately sit
+  **outside** the sidebar shell and the usual look: a copper PCB matrix grid,
+  a pixel-curtain intro, a wavy theme sweep from dark hero to light body, and
+  a floating dock nav.
+- The hero is sticky and the brief rises over it, with a dome-shaped crest as
+  its own top edge that relaxes to a flat edge as it arrives (`briefCrest.tsx`).
+  This replaced a fixed full-screen wave that had to be kept in step with the
+  scroll and left a seam. Wheel scrolling is eased by Lenis (`useGentleScroll.ts`,
+  event pages only, off under reduced motion, touch stays native). `lenis` is a
+  new dependency, about 3 kB, justified by the whole scrubbed-section feel.
+- The home page opens with an announcement modal (`features/home/eventAnnouncement.tsx`,
+  hardcoded for now, to move into Payload) with a button to `/embers`, and a "special
+  thanks to our alumni" drop box (`common/specialThanks.tsx`). The Embers footer thanks
+  the same alumni. Embers '26 is also an Events entry, created by
+  `scripts/seedEmbersEvent.ts`; its description links to `/embers`.
+- **Owner decision, 2026-11-19:** the event copy (dates, schedule, syllabus,
+  tracks) lives in JSX under `components/features/embedthon/`, not in Payload.
+  This knowingly departs from AGENTS.md §3 so the event pages can stay a
+  bespoke, one-off design. Edit `eventType.ts` and the section components
+  directly. Do not treat this as a pattern for other pages.
+- Tests: `tests/e2e/embedDays.e2e.spec.ts` (routes render, chooser navigates),
+  `tests/int/embedDays.int.spec.ts` (event data sanity, menu parity, sitemap).
 
 ### 2026-07-28 - Forms become the real thing
 

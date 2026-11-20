@@ -36,8 +36,12 @@ migration_log.txt
 .agent/
 .agents/
 .gemini/
+.freebuff/
 scratch/
 *opencode*.json
+
+# Attachments pasted into local agent/IDE sessions - never part of the project
+.codex-remote-attachments/
 
 # IDE files
 .vscode/

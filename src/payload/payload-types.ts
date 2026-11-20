@@ -224,6 +224,7 @@ export interface Achievement {
 export interface Media {
   id: number;
   alt: string;
+  _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -573,6 +574,7 @@ export interface FormMedia {
    * Describes the image for screen readers, e.g. "UPI payment QR code".
    */
   alt: string;
+  _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -714,6 +716,7 @@ export interface Gallery {
    * What is this photo? Shown on hover.
    */
   caption?: string | null;
+  _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -861,6 +864,7 @@ export interface MemberPhoto {
    * e.g., "Photo of John Doe"
    */
   alt: string;
+  _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -1957,6 +1961,7 @@ export interface EventsSelect<T extends boolean = true> {
 export interface GallerySelect<T extends boolean = true> {
   _order?: T;
   caption?: T;
+  _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -2351,6 +2356,7 @@ export interface MemberCategoriesSelect<T extends boolean = true> {
  */
 export interface MemberPhotoSelect<T extends boolean = true> {
   alt?: T;
+  _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -2566,6 +2572,7 @@ export interface CertificatesSelect<T extends boolean = true> {
  */
 export interface FormMediaSelect<T extends boolean = true> {
   alt?: T;
+  _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -2608,6 +2615,7 @@ export interface FormMediaSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
